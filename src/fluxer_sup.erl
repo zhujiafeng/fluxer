@@ -2,7 +2,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([start_link/0,start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -23,6 +23,9 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+start_link(Args) ->
+    supervisor:start_link({local, ?MODULE},?MODULE,[Args]).
+
 %%====================================================================
 %% Supervisor callbacks
 %%====================================================================
@@ -32,12 +35,20 @@ init([]) ->
     PoolArgs = pool_args(PoolName),
     FluxerArgs = fluxer_args(),
     PoolSpec = poolboy:child_spec(PoolName, PoolArgs, FluxerArgs),
+    {ok, { {one_for_one, 5, 10}, [PoolSpec]} };
+init([Args]) ->
+    PoolName = fluxer:pool_name(),
+    PoolArgs = pool_args(PoolName),
+    Host = proplists:get_value(host,Args,?DEFAULT_HOST),
+    Port = proplists:get_value(port, Args, ?DEFAULT_PORT),
+    Schema = proplists:get_value(schema, Args, ?DEFAULT_SCHEMA),
+    IsSSl = Schema =:= https,
+    FluxerArgs = [Host, Port, IsSSl, []],
+    PoolSpec = poolboy:child_spec(PoolName, PoolArgs, FluxerArgs),
     {ok, { {one_for_one, 5, 10}, [PoolSpec]} }.
-
 %%====================================================================
 %% Internal functions
 %%====================================================================
-
 pool_args(PoolName) ->
     PoolSize = application:get_env(fluxer, pool_size, ?FLUXER_POOL_SIZE),
     PoolMaxOverflow = application:get_env(fluxer, pool_max_overflow, ?FLUXER_POOL_MAX_OVERFLOW),
